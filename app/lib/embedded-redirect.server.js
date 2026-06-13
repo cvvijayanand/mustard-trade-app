@@ -1,5 +1,7 @@
 import { authenticate } from "../shopify.server";
 
+const REAUTH_URL_HEADER = "X-Shopify-API-Request-Failure-Reauthorize-Url";
+
 /**
  * Auth loaders throw Response objects (App Bridge HTML, redirects, reauth headers).
  * Return them from loaders instead of throwing — Vercel SSR turns thrown Responses
@@ -12,7 +14,7 @@ export async function returnAuthResponse(request) {
     return null;
   } catch (err) {
     if (err instanceof Response) {
-      return wrapAuthHtmlResponse(err);
+      return finalizeAuthResponse(request, err);
     }
     throw err;
   }
@@ -27,10 +29,85 @@ export async function authenticateAdminForLoader(request, onAuthenticated) {
     return onAuthenticated ? onAuthenticated(auth) : auth;
   } catch (err) {
     if (err instanceof Response) {
-      return wrapAuthHtmlResponse(err);
+      return finalizeAuthResponse(request, err);
     }
     throw err;
   }
+}
+
+/**
+ * Embedded document requests must bypass Vercel SSR for auth handoffs.
+ * Static auth pages handle their own HTML.
+ */
+export function shouldBypassEmbeddedAuthDocument(request) {
+  const url = new URL(request.url);
+
+  if (url.searchParams.get("embedded") !== "1") {
+    return false;
+  }
+
+  if (request.headers.get("authorization")) {
+    return false;
+  }
+
+  const { pathname } = url;
+
+  if (pathname.startsWith("/apps/")) {
+    return false;
+  }
+
+  if (pathname === "/auth/session-token") {
+    return false;
+  }
+
+  if (pathname === "/auth/exit-iframe" && url.searchParams.get("exitIframe")) {
+    return false;
+  }
+
+  return pathname.startsWith("/app") || pathname.startsWith("/auth/");
+}
+
+export async function handleEmbeddedAuthDocument(request) {
+  try {
+    await authenticate.admin(request);
+    return null;
+  } catch (err) {
+    if (err instanceof Response) {
+      return finalizeAuthResponse(request, err);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Normalize auth Responses for embedded iframe flows on Vercel.
+ * Converts 401 reauthorize headers into exit-iframe redirects so OAuth
+ * (accounts.shopify.com) opens in the top window, not inside the iframe.
+ */
+export async function finalizeAuthResponse(request, response) {
+  const url = new URL(request.url);
+  const isEmbedded = url.searchParams.get("embedded") === "1";
+  const isDocument = !request.headers.get("authorization");
+
+  const reauthUrl = response.headers.get(REAUTH_URL_HEADER);
+  if (isEmbedded && isDocument && response.status === 401 && reauthUrl) {
+    const appUrl = process.env.SHOPIFY_APP_URL || url.origin;
+    const params = new URLSearchParams({
+      shop: url.searchParams.get("shop") || "",
+      host: url.searchParams.get("host") || "",
+      exitIframe: reauthUrl,
+    });
+    return Response.redirect(
+      `${appUrl}/auth/exit-iframe?${params.toString()}`,
+      302,
+    );
+  }
+
+  if (response.status >= 300 && response.status < 400) {
+    return response;
+  }
+
+  return wrapAuthHtmlResponse(response);
 }
 
 /** Wrap App Bridge HTML fragments in a full document for reliable iframe delivery. */

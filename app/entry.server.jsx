@@ -1,6 +1,10 @@
 import { handleRequest as vercelHandleRequest } from "@vercel/react-router/entry.server";
 import { addDocumentResponseHeaders } from "./shopify.server";
 import { corsPreflightResponse } from "./lib/cors.server";
+import {
+  handleEmbeddedAuthDocument,
+  shouldBypassEmbeddedAuthDocument,
+} from "./lib/embedded-redirect.server";
 
 export { streamTimeout } from "@vercel/react-router/entry.server";
 
@@ -16,6 +20,13 @@ export default async function handleRequest(
 
   if (isAppProxyRoute && request.method === "OPTIONS") {
     return corsPreflightResponse(request);
+  }
+
+  if (shouldBypassEmbeddedAuthDocument(request)) {
+    const authResponse = await handleEmbeddedAuthDocument(request);
+    if (authResponse) {
+      return authResponse;
+    }
   }
 
   if (!isAppProxyRoute) {
