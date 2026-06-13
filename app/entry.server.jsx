@@ -10,7 +10,12 @@ export default async function handleRequest(
   reactRouterContext,
   loadContext,
 ) {
-  addDocumentResponseHeaders(request, responseHeaders);
+  const { pathname } = new URL(request.url);
+  const isAppProxyRoute = pathname.startsWith("/apps/");
+
+  if (!isAppProxyRoute) {
+    addDocumentResponseHeaders(request, responseHeaders);
+  }
 
   return vercelHandleRequest(
     request,

@@ -53,5 +53,5 @@ subpath = "trade-order"
 prefix = "apps"
 
 [build]
-automatically_update_urls_on_dev = true
+automatically_update_urls_on_dev = false
 dev_store_url = "mustardliving-devstore.myshopify.com"

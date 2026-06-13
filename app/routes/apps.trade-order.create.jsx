@@ -8,37 +8,40 @@
 import { authenticate } from "../shopify.server";
 import { createTradeOrder } from "../lib/trade-order.server";
 
+function proxyJson(body, status = 200) {
+  // App proxy expects a normal 2xx response; non-2xx often becomes a Shopify error page.
+  return Response.json(body, { status });
+}
+
 export const action = async ({ request }) => {
   if (request.method !== "POST") {
-    return Response.json(
-      { success: false, error: "Method not allowed" },
-      { status: 405 },
-    );
+    return proxyJson({ success: false, error: "Method not allowed" });
   }
 
   try {
     const { admin, session } = await authenticate.public.appProxy(request);
 
     if (!admin || !session) {
-      return Response.json(
-        {
-          success: false,
-          error:
-            "App is not authorized for this store. Open the app once from Shopify Admin (Apps → mustard-trade-app) to complete installation.",
-        },
-        { status: 503 },
-      );
+      return proxyJson({
+        success: false,
+        error:
+          "App is not authorized for this store. Open the app once from Shopify Admin (Apps → mustard-trade-app) to complete installation.",
+      });
     }
 
     const payload = await request.json();
     const result = await createTradeOrder(admin, payload);
-    return Response.json(result);
+    return proxyJson(result);
   } catch (err) {
+    if (err instanceof Response) {
+      throw err;
+    }
+
     console.error("Trade order create failed:", err);
-    return Response.json(
-      { success: false, error: err.message || "Order creation failed" },
-      { status: 500 },
-    );
+    return proxyJson({
+      success: false,
+      error: err.message || "Order creation failed",
+    });
   }
 };
 
@@ -46,5 +49,7 @@ export const loader = async ({ request }) => {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204 });
   }
-  return Response.json({ error: "Use POST" }, { status: 405 });
+
+  // Health check for app proxy — Shopify treats 4xx/5xx as proxy failures.
+  return proxyJson({ ok: true, message: "POST JSON to create a trade order" });
 };
