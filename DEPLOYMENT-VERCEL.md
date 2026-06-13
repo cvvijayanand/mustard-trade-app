@@ -11,7 +11,7 @@
 **Option A — Vercel Postgres**
 
 1. Vercel project → **Storage** → **Create Database** → Postgres
-2. Connect it to the project; `DATABASE_URL` is added automatically
+2. Connect it to the project; copy the connection string into `mustard_trade_DATABASE_URL`
 
 **Option B — Neon (free tier)**
 
@@ -22,7 +22,7 @@
 Run migrations once (from your machine):
 
 ```bash
-DATABASE_URL="your-postgres-url" npx prisma migrate deploy
+mustard_trade_DATABASE_URL="your-postgres-url" npx prisma migrate deploy
 ```
 
 ## 2. Deploy on Vercel
@@ -38,7 +38,7 @@ DATABASE_URL="your-postgres-url" npx prisma migrate deploy
 | `SHOPIFY_API_SECRET` | Dev Dashboard → Client secret                                  |
 | `SCOPES`             | Same as `shopify.app.toml` scopes (comma-separated)            |
 | `SHOPIFY_APP_URL`    | `https://YOUR-PROJECT.vercel.app` until custom domain is ready |
-| `DATABASE_URL`       | Postgres connection string (pooled URL for Neon)               |
+| `mustard_trade_DATABASE_URL` | Postgres connection string (pooled URL for Neon)         |
 | `NODE_ENV`           | `production`                                                   |
 
 
@@ -81,7 +81,7 @@ Use Postgres locally (recommended) or keep a separate dev DB:
 
 ```bash
 cp .env.example .env
-# Fill DATABASE_URL, SHOPIFY_* 
+# Fill mustard_trade_DATABASE_URL, SHOPIFY_* 
 shopify app dev
 ```
 
