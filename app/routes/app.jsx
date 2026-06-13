@@ -10,6 +10,11 @@ export const loader = async ({ request }) => {
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
+// For redirects to Shopify URLs (billing confirmation, admin pages), use:
+//   const { redirect } = await authenticate.admin(request);
+//   throw redirect(url, { target: "_parent" });
+// Or: import { redirectOutsideIframe } from "../lib/embedded-redirect.server";
+
 export default function App() {
   const { apiKey } = useLoaderData();
 
