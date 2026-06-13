@@ -7,22 +7,27 @@
 
 import { authenticate } from "../shopify.server";
 import { createTradeOrder } from "../lib/trade-order.server";
+import { corsPreflightResponse, withCors } from "../lib/cors.server";
 
-function proxyJson(body, status = 200) {
+function proxyJson(request, body, status = 200) {
   // App proxy expects a normal 2xx response; non-2xx often becomes a Shopify error page.
-  return Response.json(body, { status });
+  return withCors(request, Response.json(body, { status }));
 }
 
 export const action = async ({ request }) => {
+  if (request.method === "OPTIONS") {
+    return corsPreflightResponse(request);
+  }
+
   if (request.method !== "POST") {
-    return proxyJson({ success: false, error: "Method not allowed" });
+    return proxyJson(request, { success: false, error: "Method not allowed" });
   }
 
   try {
     const { admin, session } = await authenticate.public.appProxy(request);
 
     if (!admin || !session) {
-      return proxyJson({
+      return proxyJson(request, {
         success: false,
         error:
           "App is not authorized for this store. Open the app once from Shopify Admin (Apps → mustard-trade-app) to complete installation.",
@@ -31,14 +36,14 @@ export const action = async ({ request }) => {
 
     const payload = await request.json();
     const result = await createTradeOrder(admin, payload);
-    return proxyJson(result);
+    return proxyJson(request, result);
   } catch (err) {
     if (err instanceof Response) {
-      throw err;
+      throw withCors(request, err);
     }
 
     console.error("Trade order create failed:", err);
-    return proxyJson({
+    return proxyJson(request, {
       success: false,
       error: err.message || "Order creation failed",
     });
@@ -47,9 +52,12 @@ export const action = async ({ request }) => {
 
 export const loader = async ({ request }) => {
   if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204 });
+    return corsPreflightResponse(request);
   }
 
   // Health check for app proxy — Shopify treats 4xx/5xx as proxy failures.
-  return proxyJson({ ok: true, message: "POST JSON to create a trade order" });
+  return proxyJson(request, {
+    ok: true,
+    message: "POST JSON to create a trade order",
+  });
 };
