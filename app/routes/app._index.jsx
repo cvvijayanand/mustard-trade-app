@@ -2,16 +2,22 @@ import { useEffect } from "react";
 import { useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { authenticate } from "../shopify.server";
+import { authenticateAdminForLoader } from "../lib/embedded-redirect.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-
+  const result = await authenticateAdminForLoader(request);
+  if (result instanceof Response) {
+    return result;
+  }
   return null;
 };
 
 export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
+  const authResult = await authenticateAdminForLoader(request);
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+  const { admin } = authResult;
   const color = ["Red", "Orange", "Yellow", "Green"][
     Math.floor(Math.random() * 4)
   ];

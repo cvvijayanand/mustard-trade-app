@@ -1,13 +1,19 @@
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
-import { authenticate } from "../shopify.server";
+import { authenticateAdminForLoader } from "../lib/embedded-redirect.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  const result = await authenticateAdminForLoader(request, () => ({
+    // eslint-disable-next-line no-undef
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+  }));
 
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  if (result instanceof Response) {
+    return result;
+  }
+
+  return result;
 };
 
 // For redirects to Shopify URLs (billing confirmation, admin pages), use:
