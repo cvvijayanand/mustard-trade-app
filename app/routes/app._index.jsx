@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticateAdminForLoader } from "../lib/embedded-redirect.server";
+import { appPath, useAppSearch } from "../lib/embedded-search.js";
 
 export const loader = async ({ request }) => {
   const result = await authenticateAdminForLoader(request);
@@ -135,6 +136,7 @@ export const action = async ({ request }) => {
 export default function Index() {
   const fetcher = useFetcher();
   const shopify = useAppBridge();
+  const search = useAppSearch();
   const isLoading =
     ["loading", "submitting"].includes(fetcher.state) &&
     fetcher.formMethod === "POST";
@@ -162,7 +164,9 @@ export default function Index() {
             App Bridge
           </s-link>{" "}
           interface examples like an{" "}
-          <s-link href="/app/additional">additional page in the app nav</s-link>
+          <s-link href={appPath("/app/additional", search)}>
+            additional page in the app nav
+          </s-link>
           , as well as an{" "}
           <s-link
             href="https://shopify.dev/docs/api/admin-graphql"

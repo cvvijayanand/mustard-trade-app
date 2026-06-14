@@ -1,17 +1,16 @@
 import { Form, useLoaderData, redirect } from "react-router";
-import { login } from "../../shopify.server";
 import styles from "./styles.module.css";
+import { login } from "../../shopify.server";
+import { redirectIfEmbeddedWithoutShop } from "../../lib/embedded-search.server";
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
 
+  redirectIfEmbeddedWithoutShop(request);
+
+  // Bootstrap OAuth / embedded auth via /?shop=your-store.myshopify.com
   if (url.searchParams.get("shop")) {
-    // Embedded loads must stay on the app — login() redirects to admin.shopify.com
-    // inside the iframe, which the browser blocks ("refused to connect").
-    if (url.searchParams.get("embedded") === "1") {
-      throw redirect(`/app?${url.searchParams.toString()}`);
-    }
-    await login(request);
+    throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
   return { showForm: Boolean(login) };

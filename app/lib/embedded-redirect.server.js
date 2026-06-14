@@ -1,4 +1,8 @@
 import { authenticate } from "../shopify.server";
+import {
+  getEmbeddedSearchParams,
+  redirectIfEmbeddedWithoutShop,
+} from "./embedded-search.server";
 
 const REAUTH_URL_HEADER = "X-Shopify-API-Request-Failure-Reauthorize-Url";
 
@@ -9,6 +13,8 @@ const REAUTH_URL_HEADER = "X-Shopify-API-Request-Failure-Reauthorize-Url";
  * "admin.shopify.com refused to connect" in the Admin iframe.
  */
 export async function returnAuthResponse(request) {
+  redirectIfEmbeddedWithoutShop(request);
+
   try {
     await authenticate.admin(request);
     return null;
@@ -24,6 +30,8 @@ export async function returnAuthResponse(request) {
  * Run authenticate.admin in a route loader; return auth Responses directly.
  */
 export async function authenticateAdminForLoader(request, onAuthenticated) {
+  redirectIfEmbeddedWithoutShop(request);
+
   try {
     const auth = await authenticate.admin(request);
     return onAuthenticated ? onAuthenticated(auth) : auth;
@@ -68,6 +76,8 @@ export function shouldBypassEmbeddedAuthDocument(request) {
 }
 
 export async function handleEmbeddedAuthDocument(request) {
+  redirectIfEmbeddedWithoutShop(request);
+
   try {
     await authenticate.admin(request);
     return null;
@@ -92,11 +102,11 @@ export async function finalizeAuthResponse(request, response) {
   const reauthUrl = response.headers.get(REAUTH_URL_HEADER);
   if (isEmbedded && isDocument && response.status === 401 && reauthUrl) {
     const appUrl = process.env.SHOPIFY_APP_URL || url.origin;
-    const params = new URLSearchParams({
-      shop: url.searchParams.get("shop") || "",
-      host: url.searchParams.get("host") || "",
-      exitIframe: reauthUrl,
-    });
+    const params = getEmbeddedSearchParams(url);
+    params.set("exitIframe", reauthUrl);
+    if (!params.has("embedded")) {
+      params.set("embedded", "1");
+    }
     return Response.redirect(
       `${appUrl}/auth/exit-iframe?${params.toString()}`,
       302,
